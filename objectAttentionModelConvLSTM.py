@@ -6,7 +6,7 @@ from MyConvLSTMCell import *
 
 
 class attentionModel(nn.Module):
-    def __init__(self, num_classes=61, mem_size=512, cam=True):
+    def __init__(self, num_classes=61, mem_size=512, CAM=True, device='cuda'):
         super(attentionModel, self).__init__()
         self.num_classes = num_classes
         self.resNet = resnetMod.resnet34(True, True)
@@ -17,11 +17,12 @@ class attentionModel(nn.Module):
         self.dropout = nn.Dropout(0.7)
         self.fc = nn.Linear(mem_size, self.num_classes)
         self.classifier = nn.Sequential(self.dropout, self.fc)
-        self.cam = cam
+        self.cam = CAM
+        self.device = device
 
     def forward(self, inputVariable):
-        state = (torch.zeros((inputVariable.size(1), self.mem_size, 7, 7)).cuda(),
-                 torch.zeros((inputVariable.size(1), self.mem_size, 7, 7)).cuda())
+        state = (torch.zeros((inputVariable.size(1), self.mem_size, 7, 7)).to(self.device),
+                 torch.zeros((inputVariable.size(1), self.mem_size, 7, 7)).to(self.device))
         for t in range(inputVariable.size(0)):
             logit, feature_conv, feature_convNBN = self.resNet(inputVariable[t])
             bz, nc, h, w = feature_conv.size()
@@ -29,6 +30,7 @@ class attentionModel(nn.Module):
             probs, idxs = logit.sort(1, True)
 
             if self.cam:
+                #print("cam")
                 class_idx = idxs[:, 0]
                 cam = torch.bmm(self.weight_softmax[class_idx].unsqueeze(1), feature_conv1)
                 attentionMAP = F.softmax(cam.squeeze(1), dim=1)
@@ -36,7 +38,8 @@ class attentionModel(nn.Module):
                 attentionFeat = feature_convNBN * attentionMAP.expand_as(feature_conv)
                 state = self.lstm_cell(attentionFeat, state)
             else:
-                state = self.lstm_cell(feature_conv1, state)
+                #print("no cam")
+                state = self.lstm_cell(feature_convNBN, state)
 
         feats1 = self.avgpool(state[1]).view(state[1].size(0), -1)
         feats = self.classifier(feats1)

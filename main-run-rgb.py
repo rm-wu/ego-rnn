@@ -9,9 +9,16 @@ import sys
 DEVICE = "cuda"
 
 def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir, seqLen, trainBatchSize,
-             valBatchSize, numEpochs, lr1, decay_factor, decay_step, memSize, CAM=True):
+             valBatchSize, numEpochs, lr1, decay_factor, decay_step, memSize, CAM=True, debug=False):
     # GTEA 61
     num_classes = 61
+
+    if debug:
+        n_workers = 0
+        device = 'cpu'
+    else:
+        n_workers = 4
+        device = 'cuda'
 
     # Train/Validation/Test split
     train_splits = ["S1", "S3", "S4"]
@@ -43,14 +50,14 @@ def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir,
                                 seqLen=seqLen, fmt='.png')
 
     train_loader = torch.utils.data.DataLoader(vid_seq_train, batch_size=trainBatchSize,
-                                               shuffle=True, num_workers=4, pin_memory=True)
+                                               shuffle=True, num_workers=n_workers, pin_memory=True)
 
     vid_seq_val = makeDataset(train_data_dir, splits=val_splits,
                               spatial_transform=Compose([Scale(256), CenterCrop(224), ToTensor(), normalize]),
                               seqLen=seqLen, fmt='.png', verbose=False)
 
     val_loader = torch.utils.data.DataLoader(vid_seq_val, batch_size=valBatchSize,
-                                             shuffle=False, num_workers=4, pin_memory=True)
+                                             shuffle=False, num_workers=n_workers, pin_memory=True)
     valInstances = vid_seq_val.__len__()
 
     '''
@@ -71,13 +78,13 @@ def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir,
     train_params = []
     if stage == 1:
 
-        model = attentionModel(num_classes=num_classes, mem_size=memSize)
+        model = attentionModel(num_classes=num_classes, mem_size=memSize, CAM=CAM, device=device)
         model.train(False)
         for params in model.parameters():
             params.requires_grad = False
     else:
 
-        model = attentionModel(num_classes=num_classes, mem_size=memSize)
+        model = attentionModel(num_classes=num_classes, mem_size=memSize, CAM=CAM, device=device)
         model.load_state_dict(torch.load(stage1_dict))
         model.train(False)
         for params in model.parameters():
@@ -131,7 +138,7 @@ def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir,
     model.lstm_cell.train(True)
 
     model.classifier.train(True)
-    model.cuda()
+    model.to(device)
 
     loss_fn = nn.CrossEntropyLoss()
 
@@ -163,15 +170,15 @@ def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir,
             train_iter += 1
             iterPerEpoch += 1
             optimizer_fn.zero_grad()
-            inputVariable = inputs.permute(1, 0, 2, 3, 4).to(DEVICE)
-            labelVariable = targets.to(DEVICE)
+            inputVariable = inputs.permute(1, 0, 2, 3, 4).to(device)
+            labelVariable = targets.to(device)
             trainSamples += inputs.size(0)
             output_label, _ = model(inputVariable)
             loss = loss_fn(output_label, labelVariable)
             loss.backward()
             optimizer_fn.step()
             _, predicted = torch.max(output_label.data, 1)
-            numCorrTrain += (predicted == targets.cuda()).sum()
+            numCorrTrain += (predicted == targets.to(device)).sum()
             epoch_loss += loss.data.item()
         avg_loss = epoch_loss/iterPerEpoch
         trainAccuracy = (numCorrTrain.data.item() / trainSamples) * 100
@@ -189,13 +196,13 @@ def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir,
             for j, (inputs, targets) in enumerate(val_loader):
                 val_iter += 1
                 val_samples += inputs.size(0)
-                inputVariable = inputs.permute(1, 0, 2, 3, 4).to(DEVICE)
-                labelVariable = targets.to(DEVICE)
+                inputVariable = inputs.permute(1, 0, 2, 3, 4).to(device)
+                labelVariable = targets.to(device)
                 output_label, _ = model(inputVariable)
                 val_loss = loss_fn(output_label, labelVariable)
                 val_loss_epoch += val_loss.data.item()
                 _, predicted = torch.max(output_label.data, 1)
-                numCorr += (predicted == targets.cuda()).sum()
+                numCorr += (predicted == targets.to(device)).sum()
             val_accuracy = (numCorr.data.item() / val_samples) * 100
             avg_val_loss = val_loss_epoch / val_iter
             print('Valid: Epoch = {} | Loss {} | Accuracy = {}'.format(epoch + 1, avg_val_loss, val_accuracy))
@@ -237,6 +244,7 @@ def __main__():
     parser.add_argument('--decayRate', type=float, default=0.1, help='Learning rate decay rate')
     parser.add_argument('--memSize', type=int, default=512, help='ConvLSTM hidden state size')
     parser.add_argument('--CAM', type=str, default='y', help='C Attention Maps')
+    parser.add_argument('--debug', action="store_true")
 
     args = parser.parse_args()
 
@@ -255,8 +263,9 @@ def __main__():
     decayRate = args.decayRate
     memSize = args.memSize
     CAM = args.CAM == 'y'
+    debug = args.debug
 
     main_run(dataset, stage, trainDatasetDir, valDatasetDir, stage1Dict, outDir, seqLen, trainBatchSize,
-             valBatchSize, numEpochs, lr1, decayRate, stepSize, memSize, CAM)
+             valBatchSize, numEpochs, lr1, decayRate, stepSize, memSize, CAM, debug)
 
 __main__()
