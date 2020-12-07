@@ -21,11 +21,11 @@ def gen_split(root_dir,
     root_dir = os.path.join(root_dir, 'flow_x_processed')  # root_dir/flow_#_processed/
     for split in splits:
         dir1 = os.path.join(root_dir, split)  # root_dir/flow_#_processed/S#/
-        print(dir1)
+        #print(dir1)
         class_id = 0
         for target in sorted(os.listdir(dir1)):
             dir2 = os.path.join(dir1, target)  # root_dir/flow_#_processed/S#/target/
-            print(dir2)
+            #print(dir2)
             insts = sorted(os.listdir(dir2))
             if insts:
                 for inst in insts:
