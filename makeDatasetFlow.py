@@ -74,6 +74,7 @@ class makeDataset(Dataset):
     def __getitem__(self, idx):
         vid_nameX = self.imagesX[idx]
         vid_nameY = self.imagesY[idx]
+        # print(vid_nameX)
         label = self.labels[idx]
         numFrame = self.numFrames[idx]
         inpSeqSegs = []
@@ -103,13 +104,18 @@ class makeDataset(Dataset):
             else:
                 if self.phase == 'train':
                     startFrame = random.randint(1, numFrame - self.stackSize)
+                    #print(startFrame)
                 else:
                     startFrame = np.ceil((numFrame - self.stackSize)/2)
             #print(startFrame)
             inpSeq = []
-            for k in range(self.stackSize):
-                i = k + int(startFrame)
-                # print(k, startFrame, i)
+            # for k in range(self.stackSize):
+            #   i = k + int(startFrame)
+            #print(startFrame, np.arange(startFrame, numFrame).shape)
+
+            for k in sorted(np.random.choice(np.arange(startFrame, numFrame+1), size=self.stackSize, replace=False)):
+                i = k
+                #print(k, startFrame, numFrame)
                 fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + '.png'
                 # print(fl_name)
                 img = Image.open(fl_name)
@@ -118,6 +124,8 @@ class makeDataset(Dataset):
                 fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + '.png'
                 img = Image.open(fl_name)
                 inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
+           
+
             # inpSeq is a list of len stackSize * 2 and each element is a Tensor of size 1 x 224 x 224 (n_ch x width x height)
             # inpSeqSegs is a Tensor with dim (2 * stackSize) x 224 x 224
             inpSeqSegs = torch.stack(inpSeq, 0).squeeze(1)
