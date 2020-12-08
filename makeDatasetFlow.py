@@ -23,10 +23,10 @@ def gen_split(root_dir,
         dir1 = os.path.join(root_dir, split)  # root_dir/flow_#_processed/S#/
         #print(dir1)
         class_id = 0
-        for target in sorted(os.listdir(dir1)):
+        for target in sorted([f for f in os.listdir(dir1) if not f.startswith('.')]):
             dir2 = os.path.join(dir1, target)  # root_dir/flow_#_processed/S#/target/
             #print(dir2)
-            insts = sorted(os.listdir(dir2))
+            insts = sorted([f for f in os.listdir(dir2) if not f.startswith('.')])
             if insts:
                 for inst in insts:
                     inst_dir = os.path.join(dir2, inst)  # root_dir/flow_#_processed/S#/target/#/
@@ -118,5 +118,7 @@ class makeDataset(Dataset):
                 fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + '.png'
                 img = Image.open(fl_name)
                 inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
+            # inpSeq is a list of len stackSize * 2 and each element is a Tensor of size 1 x 224 x 224 (n_ch x width x height)
+            # inpSeqSegs is a Tensor with dim (2 * stackSize) x 224 x 224
             inpSeqSegs = torch.stack(inpSeq, 0).squeeze(1)
             return inpSeqSegs, label#, fl_name

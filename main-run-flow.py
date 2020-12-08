@@ -8,16 +8,23 @@ import argparse
 import sys
 import torch
 
-DEVICE = "cuda"
+# DEVICE = "cuda"
 
 def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBatchSize, numEpochs, lr1,
-             decay_factor, decay_step):
+             decay_factor, decay_step, debug):
     # GTEA 61
     num_classes = 61
 
     # Train/Validation/Test split
     train_splits = ["S1", "S3", "S4"]
     val_splits = ["S2"]
+
+    if debug:
+        n_workers = 0
+        device = 'cpu'
+    else:
+        n_workers = 4
+        device = 'cuda'
 
     min_accuracy = 0
 
@@ -34,7 +41,7 @@ def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBa
     val_log_loss = open((model_folder + '/val_log_loss.txt'), 'w')
     val_log_acc = open((model_folder + '/val_log_acc.txt'), 'w')
 
-    num_workers = 4
+    #num_workers = 4
     # Data loader
     normalize = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
@@ -45,13 +52,13 @@ def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBa
                                 stackSize=stackSize, fmt='.png')
 
     train_loader = torch.utils.data.DataLoader(vid_seq_train, batch_size=trainBatchSize,
-                            shuffle=True, sampler=None, num_workers=num_workers, pin_memory=True)
+                            shuffle=True, sampler=None, num_workers=n_workers, pin_memory=True)
 
     vid_seq_val = makeDataset(trainDir, val_splits, spatial_transform=Compose([Scale(256), CenterCrop(224), ToTensor(), normalize]),
                                sequence=False, stackSize=stackSize, fmt='.png', phase='Test')
 
     val_loader = torch.utils.data.DataLoader(vid_seq_val, batch_size=valBatchSize,
-                            shuffle=False, num_workers=num_workers, pin_memory=True)
+                            shuffle=False, num_workers=n_workers, pin_memory=True)
     valInstances = vid_seq_val.__len__()
 
 
@@ -62,7 +69,7 @@ def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBa
     model.train(True)
     train_params = list(model.parameters())
 
-    model.cuda()
+    model.to(device)
 
     loss_fn = nn.CrossEntropyLoss()
 
@@ -82,15 +89,15 @@ def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBa
             train_iter += 1
             iterPerEpoch += 1
             optimizer_fn.zero_grad()
-            inputVariable = inputs.to(DEVICE)
-            labelVariable = targets.to(DEVICE)
+            inputVariable = inputs.to(device)
+            labelVariable = targets.to(device)
             trainSamples += inputs.size(0)
             output_label, _ = model(inputVariable)
             loss = loss_fn(output_label, labelVariable)
             loss.backward()
             optimizer_fn.step()
             _, predicted = torch.max(output_label.data, 1)
-            numCorrTrain += (predicted == targets.to(DEVICE )).sum()
+            numCorrTrain += (predicted == targets.to(device )).sum()
             epoch_loss += loss.data.item()
 
         optim_scheduler.step()
@@ -110,13 +117,13 @@ def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBa
             for j, (inputs, targets) in enumerate(val_loader):
                 val_iter += 1
                 val_samples += inputs.size(0)
-                inputVariable = inputs.to(DEVICE)
-                labelVariable = targets.to(DEVICE)
+                inputVariable = inputs.to(device)
+                labelVariable = targets.to(device)
                 output_label, _ = model(inputVariable)
                 val_loss = loss_fn(output_label, labelVariable)
                 val_loss_epoch += val_loss.data.item()
                 _, predicted = torch.max(output_label.data, 1)
-                numCorr += (predicted == targets.to(DEVICE)).sum()
+                numCorr += (predicted == targets.to(device)).sum()
             val_accuracy = (numCorr.data.item() / val_samples) * 100
             avg_val_loss = val_loss_epoch / val_iter
             print('Validation: Epoch = {} | Loss = {} | Accuracy = {}'.format(epoch + 1, avg_val_loss, val_accuracy))
@@ -152,6 +159,7 @@ def __main__():
     parser.add_argument('--lr', type=float, default=1e-2, help='Learning rate')
     parser.add_argument('--stepSize', type=float, default=[150, 300, 500], nargs="+", help='Learning rate decay step')
     parser.add_argument('--decayRate', type=float, default=0.5, help='Learning rate decay rate')
+    parser.add_argument('--debug', action="store_true")
 
     args = parser.parse_args()
 
@@ -166,8 +174,9 @@ def __main__():
     lr1 = args.lr
     stepSize = args.stepSize
     decayRate = args.decayRate
+    debug = args.debug
 
     main_run(dataset, trainDatasetDir, valDatasetDir, outDir, stackSize, trainBatchSize, valBatchSize, numEpochs, lr1,
-             decayRate, stepSize)
+             decayRate, stepSize, debug)
 
 __main__()
