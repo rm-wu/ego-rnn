@@ -110,8 +110,11 @@ class makeDataset(Dataset):
                 else:
                     startFrame = np.ceil((numFrame - self.stackSize)/2)
             inpSeq = []
-            for k in range(self.stackSize):
-                i = k + int(startFrame)
+            #for k in range(self.stackSize):
+            #    i = k + int(startFrame)
+            # TODO: Make it optional
+            for k in sorted(np.random.choice(np.arange(startFrame, numFrame+1), size=self.stackSize, replace=False)):
+                i = k
                 fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + self.fmt
                 img = Image.open(fl_name)
                 inpSeq.append(self.spatial_transform(img.convert('L'), inv=True, flow=True))
