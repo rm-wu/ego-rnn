@@ -12,8 +12,10 @@ import argparse
 import sys
 # import wandb
 
+
+
 def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir, seqLen, trainBatchSize,
-             valBatchSize, numEpochs, lr1, decay_factor, decay_step, memSize,  regression, debug, verbose, CAM):
+             valBatchSize, numEpochs, lr1, decay_factor, decay_step, memSize,  regression, rloss, debug, verbose, CAM):
     # GTEA 61
     num_classes = 61
 
@@ -169,7 +171,18 @@ def main_run(dataset, stage, train_data_dir, val_data_dir, stage1_dict, out_dir,
 
     loss_fn = nn.CrossEntropyLoss()
     if regression:
-        loss_ms_fn = nn.MSELoss() # it should work
+        if rloss == 'MSE':
+            # Mean Squared Error loss
+            loss_ms_fn = nn.MSELoss()  # it should work
+        elif rloss == 'L1':
+            # L1 loss
+            loss_ms_fn = nn.L1Loss()
+        elif rloss == 'SmoothL1':
+            # Huber Loss or Smooth L1 Loss
+            loss_ms_fn = nn.SmoothL1Loss()
+        elif rloss == 'KLdiv':
+            # Kullback-Leiber Loss
+            loss_ms_fn = nn.KLDivLoss()
     else:
         # classification
         loss_ms_fn = nn.CrossEntropyLoss()  # TODO: check paper Planamente
@@ -324,6 +337,7 @@ def __main__():
     parser.add_argument('--debug', action="store_true")
     parser.add_argument('--verbose', action="store_true")
     parser.add_argument('--CAM', type=str, default='y', help='C Attention Maps')
+    parser.add_argument('--rloss', type=str, default='MSE', help='Regression Loss')
     # TODO: check if it works and modify other main-*.py
 
 
@@ -347,8 +361,9 @@ def __main__():
     debug = args.debug
     verbose = args.verbose
     CAM = ( args.CAM == 'y' )
+    rloss = args.rloss
 
     main_run(dataset, stage, trainDatasetDir, valDatasetDir, stage1Dict, outDir, seqLen, trainBatchSize,
-             valBatchSize, numEpochs, lr1, decayRate, stepSize, memSize, regression, debug, verbose, CAM)
+             valBatchSize, numEpochs, lr1, decayRate, stepSize, memSize, regression, rloss, debug, verbose, CAM)
 
 __main__()
