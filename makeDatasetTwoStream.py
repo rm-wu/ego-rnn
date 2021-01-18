@@ -49,7 +49,8 @@ class makeDataset(Dataset):
                  numSeg=5,
                  fmt='.png',
                  phase='train',
-                 seqLen = 25):
+                 seqLen = 25,
+                 uniform_sampling=True):
         """
         Args:
             root_dir (string): Directory with all the images.
@@ -67,6 +68,7 @@ class makeDataset(Dataset):
         self.fmt = fmt
         self.phase = phase
         self.seqLen = seqLen
+        self.uniform_sampling = uniform_sampling
 
     def __len__(self):
         return len(self.imagesX)
@@ -110,18 +112,27 @@ class makeDataset(Dataset):
                 else:
                     startFrame = np.ceil((numFrame - self.stackSize)/2)
             inpSeq = []
-            #for k in range(self.stackSize):
-            #    i = k + int(startFrame)
-            # TODO: Make it optional
-            for k in sorted(np.random.choice(np.arange(startFrame, numFrame+1), size=self.stackSize, replace=False)):
-                i = k
-                fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + self.fmt
-                img = Image.open(fl_name)
-                inpSeq.append(self.spatial_transform(img.convert('L'), inv=True, flow=True))
-                # fl_names.append(fl_name)
-                fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + self.fmt
-                img = Image.open(fl_name)
-                inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
+            if self.uniform_sampling:
+                for k in sorted(np.random.choice(np.arange(startFrame, numFrame + 1), size=self.stackSize, replace=False)):
+                    i = k
+                    fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + self.fmt
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=True, flow=True))
+                    # fl_names.append(fl_name)
+                    fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + self.fmt
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
+            else:
+                for k in range(self.stackSize):
+                    i = k + int(startFrame)
+                    fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + self.fmt
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=True, flow=True))
+                    # fl_names.append(fl_name)
+                    fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + self.fmt
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
+
             inpSeqSegs = torch.stack(inpSeq, 0).squeeze(1)
 
         # Collect the rgb frames

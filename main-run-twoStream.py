@@ -12,7 +12,7 @@ import sys
 DEVICE = 'cuda'
 
 def main_run(dataset, flowModel, rgbModel, stackSize, seqLen, memSize, trainDatasetDir, valDatasetDir, outDir,
-             trainBatchSize, valBatchSize, lr1, numEpochs, decay_step, decay_factor):
+             trainBatchSize, valBatchSize, lr1, numEpochs, decay_step, decay_factor, uniformSampling):
     # GTEA 61
     num_classes = 61
 
@@ -46,7 +46,8 @@ def main_run(dataset, flowModel, rgbModel, stackSize, seqLen, memSize, trainData
                                  normalize])
 
     vid_seq_train = makeDataset(directory, train_splits, spatial_transform=spatial_transform,
-                                sequence=False, numSeg=1, stackSize=stackSize, fmt='.png', seqLen=seqLen)
+                                sequence=False, numSeg=1, stackSize=stackSize, fmt='.png', seqLen=seqLen,
+                                uniform_sampling=uniformSampling)
 
     train_loader = torch.utils.data.DataLoader(vid_seq_train, batch_size=trainBatchSize,
                                                shuffle=True, num_workers=4, pin_memory=True)
@@ -54,7 +55,7 @@ def main_run(dataset, flowModel, rgbModel, stackSize, seqLen, memSize, trainData
     vid_seq_val = makeDataset(directory, val_splits,
                               spatial_transform=Compose([Scale(256), CenterCrop(224), ToTensor(), normalize]),
                               sequence=False, numSeg=1, stackSize=stackSize, fmt='.png', phase='Test',
-                              seqLen=seqLen)
+                              seqLen=seqLen, uniform_sampling=uniformSampling)
 
     val_loader = torch.utils.data.DataLoader(vid_seq_val, batch_size=valBatchSize,
                                              shuffle=False, num_workers=2, pin_memory=True)
@@ -216,6 +217,7 @@ def __main__():
     parser.add_argument('--stepSize', type=float, default=1, help='Learning rate decay step')
     parser.add_argument('--decayRate', type=float, default=0.99, help='Learning rate decay rate')
     parser.add_argument('--memSize', type=int, default=512, help='ConvLSTM hidden state size')
+    parser.add_argument('--uniformSampling', action="store_true")
 
     args = parser.parse_args()
 
@@ -234,9 +236,10 @@ def __main__():
     decay_step = args.stepSize
     decay_factor = args.decayRate
     memSize = args.memSize
+    uniformSampling = args.uniformSampling
 
     main_run(dataset, flowModel, rgbModel, stackSize, seqLen, memSize, trainDatasetDir, valDatasetDir, outDir,
-             trainBatchSize, valBatchSize, lr1, numEpochs, decay_step, decay_factor)
+             trainBatchSize, valBatchSize, lr1, numEpochs, decay_step, decay_factor, uniformSampling)
 
 
 __main__()
