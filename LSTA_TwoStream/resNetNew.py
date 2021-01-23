@@ -2,6 +2,12 @@ import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
 
+# local
+# from .SFTLayer import *
+
+# Colab
+from SFTLayer import *
+
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
@@ -122,6 +128,9 @@ class ResNet(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+        # 2in1 stream
+        self.sft = SFTLayer(1, 2, 3, 1)
+        self.cond = CondLayer()
 
     def _make_layer(self, block, planes, blocks, stride=1, noBN=False):
         downsample = None
@@ -153,8 +162,13 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, of):
         x = self.conv1(x)
+
+        # 2in1 stream
+        of = self.cond(of)
+        x = self.sft((x, of))
+
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)

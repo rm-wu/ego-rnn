@@ -1,11 +1,16 @@
-from . import resNetNew
 from torch.autograd import Variable
-from .MyConvLSTACell import *
 import torch
+# local
+#from . import resNetNew
+#from .MyConvLSTACell import *
+
+# Colab
+import resNetNew
+from MyConvLSTACell import *
 
 
 class attentionModel(nn.Module):
-    def __init__(self, num_classes=51, mem_size=512, c_cam_classes=1000):
+    def __init__(self, num_classes=61, mem_size=512, c_cam_classes=1000):
         super(attentionModel, self).__init__()
         self.num_classes = num_classes
         self.resNet = resNetNew.resnet34(True, True)
@@ -16,13 +21,13 @@ class attentionModel(nn.Module):
         self.fc = nn.Linear(mem_size, self.num_classes)
         self.classifier = nn.Sequential(self.dropout, self.fc)
 
-    def forward(self, inputVariable, device):
+    def forward(self, inputVariable, inputFlow, device):
         state_att = (torch.zeros(inputVariable.size(1), 1, 7, 7).to(device),
                      torch.zeros(inputVariable.size(1), 1, 7, 7).to(device))
         state_inp = ((torch.zeros((inputVariable.size(1), self.mem_size, 7, 7)).to(device)),
                     (torch.zeros((inputVariable.size(1), self.mem_size, 7, 7)).to(device)))
         for t in range(inputVariable.size(0)):
-            logit, feature_conv, x = self.resNet(inputVariable[t])
+            logit, feature_conv, x = self.resNet(inputVariable[t], inputFlow[t])
             bz, nc, h, w = feature_conv.size()
             feature_conv1 = feature_conv.view(bz, nc, h * w)
             probs, idxs = logit.sort(1, True)

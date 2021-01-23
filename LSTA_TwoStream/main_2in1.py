@@ -1,15 +1,23 @@
 from __future__ import print_function, division
-from LSTA.attentionModel import *
+
 #from .attentionModel import *
 from spatial_transforms import (Compose, ToTensor, CenterCrop, Scale, Normalize, MultiScaleCornerCrop,
                                 RandomHorizontalFlip)
 from tensorboardX import SummaryWriter
-from LSTA.makeDataset import *
+
 import sys
 import argparse
 from LSTA.gen_splits import *
 import os
 import torch.nn as nn
+
+# local
+#from LSTA_TwoStream.attentionModel import *
+#from LSTA_TwoStream.makeDataset import *
+
+#Colab
+from attentionModel import *
+from makeDataset import *
 
 #TODO: create separate dirs for stage1 and stage 2
 
@@ -91,34 +99,28 @@ def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpoch
     test_log_loss = open((model_folder + '/test_log_loss.txt'), 'w')
     test_log_acc = open((model_folder + '/test_log_acc.txt'), 'w')
 
+    spatial_transform = Compose([Scale(256),
+                                 RandomHorizontalFlip(),
+                                 MultiScaleCornerCrop([1, 0.875, 0.75, 0.65625], 224),
+                                 ToTensor(),
+                                 normalize])
 
-    spatial_transform = Compose([Scale(256), RandomHorizontalFlip(), MultiScaleCornerCrop([1, 0.875, 0.75, 0.65625], 224),
-                                 ToTensor(), normalize])
+    vid_seq_train = makeDataset(root_dir, train_splits, spatial_transform=spatial_transform,
+                                sequence=False, numSeg=1, fmt='.png', seqLen=seqLen)
 
+    train_loader = torch.utils.data.DataLoader(vid_seq_train, batch_size=trainBatchSize,
+                                               shuffle=True, num_workers=n_workers, pin_memory=True)
 
-    print('Preparing dataset...')
-    trainDatasetF, testDatasetF, trainLabels, testLabels, trainNumFrames, testNumFrames, _ = gen_split(dataset_dir,
-                                                                                                  test_split)
-
-    vid_seq_train = makeDataset(trainDatasetF, trainLabels, trainNumFrames,
-                               spatial_transform=spatial_transform,
-                               fmt='.png', seqLen=seqLen)
-
-    print('Number of train samples = {}'.format(vid_seq_train.__len__()))
-
-    train_loader = torch.utils.data.DataLoader(vid_seq_train, batch_size=trainBatchSize, num_workers=n_workers, pin_memory=True)
-
-
-
-    vid_seq_test = makeDataset(testDatasetF, testLabels, testNumFrames,
-                               spatial_transform=Compose([Scale(256), CenterCrop(224), ToTensor(), normalize]),
-                               fmt='.png', seqLen=seqLen)
-
-    print('Number of test samples = {}'.format(vid_seq_test.__len__()))
-
+    vid_seq_test = makeDataset(root_dir, val_splits,
+                              spatial_transform=Compose([Scale(256), CenterCrop(224), ToTensor(), normalize]),
+                              sequence=False, numSeg=1, fmt='.png', phase='test',
+                              seqLen=seqLen)
 
     test_loader = torch.utils.data.DataLoader(vid_seq_test, batch_size=testBatchSize,
-                            shuffle=False, num_workers=n_workers_test, pin_memory=True)
+                                             shuffle=False, num_workers=n_workers_test, pin_memory=True)
+
+    print('Number of train samples = {}'.format(vid_seq_train.__len__()))
+    print('Number of test samples = {}'.format(vid_seq_test.__len__()))
 
 
     train_params = []
@@ -169,6 +171,17 @@ def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpoch
             params.requires_grad = True
             train_params += [params]
 
+        # 2in1 stream
+        for params in model.resNet.cond.parameters():
+            params.requires_grad = True
+            train_params += [params]
+
+        # motion modulation layer
+        for params in model.resNet.sft.parameters():
+            params.requires_grad = True
+            train_params += [params]
+
+
     for params in model.lsta_cell.parameters():
         params.requires_grad = True
         train_params += [params]
@@ -196,14 +209,17 @@ def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpoch
         iterPerEpoch = 0
         model.classifier.train(True)
         writer.add_scalar('lr', optimizer_fn.param_groups[0]['lr'], epoch+1)
-        for i, (inputs, targets) in enumerate(train_loader):
+        for i, (inputFlow, inputRGB, targets) in enumerate(train_loader):
             train_iter += 1
             iterPerEpoch += 1
             optimizer_fn.zero_grad()
-            inputVariable = inputs.permute(1, 0, 2, 3, 4).to(device)
+            inputVariable = inputRGB.permute(1, 0, 2, 3, 4).to(device)
+            inputFlow = inputFlow.view(
+                (inputFlow.shape[0], int(inputFlow.shape[1] / 2), 2, inputFlow.shape[2], inputFlow.shape[3]))
+            inputFlow = inputFlow.permute(1, 0, 2, 3, 4).to(device)
             labelVariable = targets.to(device)
-            trainSamples += inputs.size(0)
-            output_label, _ = model(inputVariable, device)
+            trainSamples += inputRGB.size(0)
+            output_label, _ = model(inputVariable, inputFlow, device)
             loss = loss_fn(output_label, labelVariable)
             loss.backward()
             optimizer_fn.step()
@@ -238,13 +254,16 @@ def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpoch
             test_iter = 0
             test_samples = 0
             numCorr = 0
-            for j, (inputs, targets) in enumerate(test_loader):
+            for j, (inputFlow, inputRGB, targets) in enumerate(test_loader):
                 #print('testing inst = {}'.format(j))
                 test_iter += 1
-                test_samples += inputs.size(0)
-                inputVariable = inputs.permute(1, 0, 2, 3, 4).to(device)
+                test_samples += inputRGB.size(0)
+                inputVariable = inputRGB.permute(1, 0, 2, 3, 4).to(device)
+                inputFlow = inputFlow.view(
+                    (inputFlow.shape[0], int(inputFlow.shape[1] / 2), 2, inputFlow.shape[2], inputFlow.shape[3]))
+                inputFlow = inputFlow.permute(1, 0, 2, 3, 4).to(device)
                 labelVariable = targets.to(device)
-                output_label, _ = model(inputVariable, device)
+                output_label, _ = model(inputVariable, inputFlow, device)
                 test_loss = loss_fn(output_label, labelVariable)
                 test_loss_epoch += test_loss.data.item()
                 _, predicted = torch.max(output_label.data, 1)
