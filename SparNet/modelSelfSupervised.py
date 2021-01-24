@@ -40,7 +40,7 @@ class SelfSupervisedAttentionModel(nn.Module):
 
             # MS self-supervised task
             feats_ms.append(self.ms_module(feature_conv))
-            state = self.lstm_cell(feature_conv1, state)
+            state = self.lstm_cell(feature_convNBN, state)
 
             # if self.cam:
             #     # Attention layer
