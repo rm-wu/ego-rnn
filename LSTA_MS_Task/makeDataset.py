@@ -8,9 +8,9 @@ import glob
 import random
 
 # Colab
-from LSTA_MS_Task.gen_splits import *
+from gen_splits import *
 # local
-from LSTA_MS_Task.gen_splits import *
+#from LSTA_MS_Task.gen_splits import *
 
 
 class makeDataset(Dataset): # TODO: refactor makeDatasetMS ??
@@ -52,6 +52,7 @@ class makeDataset(Dataset): # TODO: refactor makeDatasetMS ??
             print(vid_nameF, idx)
         # TODO: nota questo loop prende le immagini facendo un linspace sulla durata totale
         for i in np.linspace(1, numFrame, self.seqLen, endpoint=False):
+            #print(i)
             fl_name = vid_nameF + '/rgb/rgb' + str(int(np.floor(i))).zfill(4) + self.fmt
             img = Image.open(fl_name)
             inpSeqF.append(

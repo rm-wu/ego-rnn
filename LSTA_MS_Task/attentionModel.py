@@ -1,14 +1,14 @@
 from torch.autograd import Variable
 
-# Colab
-#from MyConvLSTACell import *
-#from MotionSegmentationModule import *
-#import resNetNew
+#Colab
+from MyConvLSTACell import *
+from MotionSegmentationModule import *
+import resNetNew
 
 # local
-from LSTA_MS_Task.MyConvLSTACell import *
-from LSTA_MS_Task.MotionSegmentationModule import *
-from . import resNetNew
+#from LSTA_MS_Task.MyConvLSTACell import *
+#from LSTA_MS_Task.MotionSegmentationModule import *
+#from . import resNetNew
 
 import torch
 

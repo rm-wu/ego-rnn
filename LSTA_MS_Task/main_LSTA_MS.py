@@ -1,9 +1,9 @@
 from __future__ import print_function, division
-from LSTA_MS_Task.attentionModel import *
+from attentionModel import *
 from spatial_transforms import (Compose, ToTensor, CenterCrop, Scale, Normalize, MultiScaleCornerCrop,
                                 RandomHorizontalFlip)
 from tensorboardX import SummaryWriter
-from LSTA_MS_Task.makeDataset import *
+from makeDataset import *
 import sys
 import argparse
 # from LSTA_MS_Task.gen_splits import *
@@ -49,7 +49,7 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
         decay_factor = decay_factor
         decay_step = decay_step
         numEpochs = numEpochs
-    elif stage == 2:
+    elif stage == 2 or stage==3:
         trainBatchSize = trainBatchSize
         testBatchSize = trainBatchSize
         lr1 = lr1
@@ -130,7 +130,7 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
     test_loader = torch.utils.data.DataLoader(vid_seq_test, batch_size=testBatchSize,
                                              shuffle=False, num_workers=n_workers, pin_memory=True)
 
-
+    print('here')
     print('Number of train samples = {}'.format(vid_seq_train.__len__()))
 
     print('Number of test samples = {}'.format(vid_seq_test.__len__()))
@@ -145,21 +145,29 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
         model.train(False)
         for params in model.parameters():
             params.requires_grad = False
-    elif stage == 2:
+    elif stage == 2 or stage==3:
         if regression:
-            model = attentionModel(num_classes=num_classes, mem_size=memSize, n_channels=1)
+            model = attentionModel(num_classes=num_classes, 
+                                mem_size=memSize, 
+                                n_channels=1, 
+                                c_cam_classes=c_cam_classes)
         else:
-            model = attentionModel(num_classes=num_classes, mem_size=memSize)
+            model = attentionModel(num_classes=num_classes, 
+                                mem_size=memSize, 
+                                c_cam_classes=c_cam_classes)
 
-        model = attentionModel(num_classes=num_classes, mem_size=memSize, c_cam_classes=c_cam_classes)
-        checkpoint_path = os.path.join(stage1_dict, 'last_checkpoint_stage' + str(1) + '.pth.tar')
+        #model = attentionModel(num_classes=num_classes, mem_size=memSize, c_cam_classes=c_cam_classes)
+        if stage == 2:
+            checkpoint_path = os.path.join(stage1_dict, 'last_checkpoint_stage' + str(1) + '.pth.tar')
+        elif stage == 3:
+            checkpoint_path = os.path.join(stage1_dict, 'last_checkpoint_stage' + str(2) + '.pth.tar')
         if os.path.exists(checkpoint_path):
                 print('Loading weights from checkpoint file {}'.format(checkpoint_path))
         else:
                 print('Checkpoint file {} does not exist'.format(checkpoint_path))
                 sys.exit()
         last_checkpoint = torch.load(checkpoint_path)
-        model.load_state_dict(last_checkpoint['model_state_dict'])
+        model.load_state_dict(last_checkpoint['model_state_dict'], strict=False)
         model.train(False)
         for params in model.parameters():
             params.requires_grad = False
@@ -193,9 +201,10 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
             train_params += [params]
 
         # Add params from ms_module
-        for params in model.ms_module.parameters():
-            params.requires_grad = True
-            train_params += [params]
+        if stage == 2:
+            for params in model.ms_module.parameters():
+                params.requires_grad = True
+                train_params += [params]
 
     for params in model.lsta_cell.parameters():
         params.requires_grad = True
@@ -271,17 +280,19 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
             trainSamples += inputs.size(0)
             output_label, _, output_ms = model(inputVariable, device)
             loss_c = loss_fn(output_label, labelVariable)
-            if regression:
-                msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0)))
-                output_ms = torch.sigmoid(output_ms)
-                output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, output_ms.size(0)))
+            if stage == 2:
+                if regression:
+                    msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0)))
+                    output_ms = torch.sigmoid(output_ms)
+                    output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, output_ms.size(0)))
+                else:
+                    # classification task
+                    msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0))).long()
+                    output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, 2, output_ms.size(0)))
+                loss_ms = loss_ms_fn(output_ms, msVariable)
+                loss = loss_c + loss_ms
             else:
-                # classification task
-                msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0))).long()
-                output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, 2, output_ms.size(0)))
-            loss_ms = loss_ms_fn(output_ms, msVariable)
-
-            loss = loss_c + loss_ms
+                loss = loss_c
             loss.backward()
             optimizer_fn.step()
             _, predicted = torch.max(output_label.data, 1)
@@ -325,18 +336,19 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
 
                 output_label, _, output_ms = model(inputVariable, device)
                 test_loss_c = loss_fn(output_label, labelVariable)
-
-                if regression:
-                    msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0)))
-                    output_ms = torch.sigmoid(output_ms)
-                    output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, output_ms.size(0)))
+                if stage == 2:
+                    if regression:
+                        msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0)))
+                        output_ms = torch.sigmoid(output_ms)
+                        output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, output_ms.size(0)))
+                    else:
+                        # classification task
+                        msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0))).long()
+                        output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, 2, output_ms.size(0)))
+                    test_loss_ms = loss_ms_fn(output_ms, msVariable)
+                    test_loss = test_loss_c + test_loss_ms
                 else:
-                    # classification task
-                    msVariable = torch.reshape(msVariable, (seqLen * 7 * 7, msVariable.size(0))).long()
-                    output_ms = torch.reshape(output_ms, (seqLen * 7 * 7, 2, output_ms.size(0)))
-                test_loss_ms = loss_ms_fn(output_ms, msVariable)
-
-                test_loss = test_loss_c + test_loss_ms
+                    test_loss = test_loss_c
                 test_loss_epoch += test_loss.data.item()
                 _, predicted = torch.max(output_label.data, 1)
                 numCorr += (predicted == targets.to(device)).sum()
