@@ -153,27 +153,30 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+    def forward(self, x, stage=0):
+        if stage == 0:
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        if self.noBN:
-            conv_layer4BN, conv_layer4NBN = self.layer4(x)
-        else:
-            conv_layer4BN = self.layer4(x)
+            x = self.layer1(x)
+            x = self.layer2(x)
+            return x
+        elif stage == 1:
+            x = self.layer3(x)
+            if self.noBN:
+                conv_layer4BN, conv_layer4NBN = self.layer4(x)
+            else:
+                conv_layer4BN = self.layer4(x)
 
-        x = self.avgpool(conv_layer4BN)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        if self.noBN:
-            return x, conv_layer4BN, conv_layer4NBN
-        else:
-            return x, conv_layer4BN
+            x = self.avgpool(conv_layer4BN)
+            x = x.view(x.size(0), -1)
+            x = self.fc(x)
+            if self.noBN:
+                return x, conv_layer4BN, conv_layer4NBN
+            else:
+                return x, conv_layer4BN
 
 
 def resnet18(pretrained=False, noBN=False, **kwargs):

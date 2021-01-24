@@ -1,16 +1,23 @@
 from __future__ import print_function, division
-from attentionModel import *
 from spatial_transforms import (Compose, ToTensor, CenterCrop, Scale, Normalize, MultiScaleCornerCrop,
                                 RandomHorizontalFlip)
 from tensorboardX import SummaryWriter
-from makeDataset import *
 import sys
 import argparse
-from gen_splits import *
+
 import os
 import torch.nn as nn
+#from gen_splits import *
 
-#TODO: create separate dirs for stage1 and stage 2
+# Colab
+#from attentionModel import *
+#from makeDataset import *
+
+# local
+from .attentionModelRepFlow import *
+#from gen_splits import *
+from .makeDataset import *
+
 
 def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSize, numEpochs, lr1, decay_factor,
              decay_step, memSize, outPool_size, split, evalInterval, debug):
@@ -122,12 +129,12 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
 
     train_params = []
     if stage == 1:
-        model = attentionModel(num_classes=num_classes, mem_size=memSize, c_cam_classes=c_cam_classes)
+        model = attentionModelRepFlow(num_classes=num_classes, mem_size=memSize, c_cam_classes=c_cam_classes)
         model.train(False)
         for params in model.parameters():
             params.requires_grad = False
     elif stage == 2:
-        model = attentionModel(num_classes=num_classes, mem_size=memSize, c_cam_classes=c_cam_classes)
+        model = attentionModelRepFlow(num_classes=num_classes, mem_size=memSize, c_cam_classes=c_cam_classes)
         checkpoint_path = os.path.join(stage1_dict, 'last_checkpoint_stage' + str(1) + '.pth.tar')
         if os.path.exists(checkpoint_path):
                 print('Loading weights from checkpoint file {}'.format(checkpoint_path))
@@ -168,6 +175,10 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
             params.requires_grad = True
             train_params += [params]
 
+        # Representation Flow Layer
+        for params in model.flow_layer.parameters():
+            params.requires_grad = True
+
     for params in model.lsta_cell.parameters():
         params.requires_grad = True
         train_params += [params]
@@ -176,6 +187,8 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
         params.requires_grad = True
         train_params += [params]
 
+    if stage == 2:
+        model.flow_layer.train(True)
     model.classifier.train(True)
     model.to(device)
 
@@ -194,6 +207,8 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
         trainSamples = 0
         iterPerEpoch = 0
         model.classifier.train(True)
+        if stage == 2:
+            model.train(True)
         writer.add_scalar('lr', optimizer_fn.param_groups[0]['lr'], epoch+1)
         for i, (inputs, targets) in enumerate(train_loader):
             train_iter += 1
