@@ -1,19 +1,18 @@
 from __future__ import print_function, division
-from LSTA.attentionModel import *
-#from .attentionModel import *
+from attentionModel import *
 from spatial_transforms import (Compose, ToTensor, CenterCrop, Scale, Normalize, MultiScaleCornerCrop,
                                 RandomHorizontalFlip)
 from tensorboardX import SummaryWriter
-from LSTA.makeDataset import *
+from makeDataset import *
 import sys
 import argparse
-from LSTA.gen_splits import *
+from gen_splits import *
 import os
 import torch.nn as nn
 
 #TODO: create separate dirs for stage1 and stage 2
 
-def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpochs, lr1, decay_factor,
+def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSize, numEpochs, lr1, decay_factor,
              decay_step, memSize, outPool_size, split, evalInterval, debug):
     if debug:
         n_workers = 0
@@ -63,7 +62,7 @@ def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpoch
     dataset_dir = root_dir
 
     #model_folder = os.path.join('.', out_dir, dataset, str(test_split))
-    model_folder = os.path.join('./', out_dir, dataset, 'LSTA', 'stage' + str(stage))
+    model_folder = os.path.join('./', out_dir, 'stage' + str(stage))
     if not os.path.exists(model_folder):
         os.makedirs(model_folder)
     else:
@@ -129,7 +128,7 @@ def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpoch
             params.requires_grad = False
     elif stage == 2:
         model = attentionModel(num_classes=num_classes, mem_size=memSize, c_cam_classes=c_cam_classes)
-        checkpoint_path = os.path.join(model_folder, 'last_checkpoint_stage' + str(1) + '.pth.tar')
+        checkpoint_path = os.path.join(stage1_dict, 'last_checkpoint_stage' + str(1) + '.pth.tar')
         if os.path.exists(checkpoint_path):
                 print('Loading weights from checkpoint file {}'.format(checkpoint_path))
         else:
@@ -232,14 +231,14 @@ def main_run(dataset, stage, root_dir, out_dir, seqLen, trainBatchSize, numEpoch
         torch.save(save_file, save_path_model)
 
         if (epoch+1) % evalInterval == 0:
-            print('Testing...')
+            #print('Testing...')
             model.train(False)
             test_loss_epoch = 0
             test_iter = 0
             test_samples = 0
             numCorr = 0
             for j, (inputs, targets) in enumerate(test_loader):
-                print('testing inst = {}'.format(j))
+                #print('testing inst = {}'.format(j))
                 test_iter += 1
                 test_samples += inputs.size(0)
                 inputVariable = inputs.permute(1, 0, 2, 3, 4).to(device)
@@ -284,6 +283,8 @@ def __main__():
     parser.add_argument('--stage', type=int, default=1, help='Training stage')
     parser.add_argument('--root_dir', type=str, default='dataset',
                         help='Dataset directory')
+    parser.add_argument('--stage1dict', type=str, default='dataset',
+                        help='Dataset directory')
     parser.add_argument('--outDir', type=str, default='experiments', help='Directory to save results')
     parser.add_argument('--seqLen', type=int, default=25, help='Length of sequence')
     parser.add_argument('--trainBatchSize', type=int, default=32, help='Training batch size')
@@ -301,6 +302,7 @@ def __main__():
     dataset = args.dataset
     stage = args.stage
     root_dir = args.root_dir
+    stage1_dict = args.stage1dict
     outDir = args.outDir
     seqLen = args.seqLen
     trainBatchSize = args.trainBatchSize
@@ -314,7 +316,7 @@ def __main__():
     split = args.split
     debug = args.debug
 
-    main_run(dataset=dataset, stage=stage, root_dir=root_dir, out_dir=outDir, seqLen=seqLen,
+    main_run(dataset=dataset, stage=stage, root_dir=root_dir, stage1_dict=stage1_dict, out_dir=outDir, seqLen=seqLen,
              trainBatchSize=trainBatchSize, numEpochs=numEpochs, lr1=lr1, decay_factor=decayRate,
              decay_step=stepSize, memSize=memSize, outPool_size=outPool_size, evalInterval=evalInterval,
              split=split, debug=debug)

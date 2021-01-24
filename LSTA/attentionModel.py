@@ -1,6 +1,6 @@
-from . import resNetNew
+import resNetNew
 from torch.autograd import Variable
-from .MyConvLSTACell import *
+from MyConvLSTACell import *
 import torch
 
 
