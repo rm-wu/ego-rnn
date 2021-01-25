@@ -49,13 +49,13 @@ def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBa
                                  ToTensor(), normalize])
 
     vid_seq_train = makeDataset(trainDir, train_splits, spatial_transform=spatial_transform, sequence=False,
-                                stackSize=stackSize, fmt='.png')
+                                stackSize=stackSize, fmt='.png', uniform_sampling=uniform_sampling)
 
     train_loader = torch.utils.data.DataLoader(vid_seq_train, batch_size=trainBatchSize,
                             shuffle=True, sampler=None, num_workers=n_workers, pin_memory=True)
 
     vid_seq_val = makeDataset(trainDir, val_splits, spatial_transform=Compose([Scale(256), CenterCrop(224), ToTensor(), normalize]),
-                               sequence=False, stackSize=stackSize, fmt='.png', phase='Test')
+                               sequence=False, stackSize=stackSize, fmt='.png', phase='Test', uniform_sampling=uniform_sampling)
 
     val_loader = torch.utils.data.DataLoader(vid_seq_val, batch_size=valBatchSize,
                             shuffle=False, num_workers=n_workers, pin_memory=True)
