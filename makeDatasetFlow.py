@@ -51,6 +51,7 @@ class makeDataset(Dataset):
                  numSeg = 1,
                  fmt='.png',
                  phase='train',
+                 uniform_sampling = False,
                  verbose=False):
         """
         Args:
@@ -67,6 +68,7 @@ class makeDataset(Dataset):
         self.stackSize = stackSize
         self.fmt = fmt
         self.phase = phase
+        self.uniform_sampling = uniform_sampling
 
     def __len__(self):
         return len(self.imagesX)
@@ -109,22 +111,32 @@ class makeDataset(Dataset):
                     startFrame = np.ceil((numFrame - self.stackSize)/2)
             #print(startFrame)
             inpSeq = []
-            # for k in range(self.stackSize):
-            #   i = k + int(startFrame)
-            #print(startFrame, np.arange(startFrame, numFrame).shape)
+            if self.uniform_sampling:
+                for k in sorted(
+                        np.random.choice(np.arange(startFrame, numFrame + 1), size=self.stackSize, replace=False)):
+                    i = k
+                    # print(k, startFrame, numFrame)
+                    fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + '.png'
+                    # print(fl_name)
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=True, flow=True))
+                    # fl_names.append(fl_name)
+                    fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + '.png'
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
+            else:
+                for k in range(self.stackSize):
+                    i = k + int(startFrame)
+                    #print(startFrame, np.arange(startFrame, numFrame).shape)
+                    fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + '.png'
+                    # print(fl_name)
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=True, flow=True))
+                    # fl_names.append(fl_name)
+                    fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + '.png'
+                    img = Image.open(fl_name)
+                    inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
 
-            for k in sorted(np.random.choice(np.arange(startFrame, numFrame+1), size=self.stackSize, replace=False)):
-                i = k
-                #print(k, startFrame, numFrame)
-                fl_name = vid_nameX + '/flow_x_' + str(int(round(i))).zfill(5) + '.png'
-                # print(fl_name)
-                img = Image.open(fl_name)
-                inpSeq.append(self.spatial_transform(img.convert('L'), inv=True, flow=True))
-                # fl_names.append(fl_name)
-                fl_name = vid_nameY + '/flow_y_' + str(int(round(i))).zfill(5) + '.png'
-                img = Image.open(fl_name)
-                inpSeq.append(self.spatial_transform(img.convert('L'), inv=False, flow=True))
-           
 
             # inpSeq is a list of len stackSize * 2 and each element is a Tensor of size 1 x 224 x 224 (n_ch x width x height)
             # inpSeqSegs is a Tensor with dim (2 * stackSize) x 224 x 224

@@ -11,7 +11,7 @@ import torch
 # DEVICE = "cuda"
 
 def main_run(dataset, trainDir, valDir, outDir, stackSize, trainBatchSize, valBatchSize, numEpochs, lr1,
-             decay_factor, decay_step, debug):
+             decay_factor, decay_step, uniform_sampling, debug):
     # GTEA 61
     num_classes = 61
 
@@ -160,6 +160,7 @@ def __main__():
     parser.add_argument('--stepSize', type=float, default=[150, 300, 500], nargs="+", help='Learning rate decay step')
     parser.add_argument('--decayRate', type=float, default=0.5, help='Learning rate decay rate')
     parser.add_argument('--debug', action="store_true")
+    parser.add_argument('--uniform_sampling', action="store_true" )
 
     args = parser.parse_args()
 
@@ -175,8 +176,9 @@ def __main__():
     stepSize = args.stepSize
     decayRate = args.decayRate
     debug = args.debug
+    uniform_sampling = args.uniform_sampling
 
     main_run(dataset, trainDatasetDir, valDatasetDir, outDir, stackSize, trainBatchSize, valBatchSize, numEpochs, lr1,
-             decayRate, stepSize, debug)
+             decayRate, stepSize, uniform_sampling, debug)
 
 __main__()
