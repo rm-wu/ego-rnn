@@ -1,17 +1,20 @@
-# Attention is All We Need: Nailing Down Object-centric Attention for Egocentric Activity Recognition
+# Machine Learning and Deep Learning - 01TXFSM
+##  Final Project: First Person Action Recognition
 
-The git contains the source code associated with our BMVC 2018 paper:
-"Attention is All We Need: Nailing Down Object-centric Attention for Egocentric Activity Recognition"
-The paper is available in [here](https://arxiv.org/pdf/1807.11794.pdf).
+The git contains the source code associated with the final project of the course Machine Learning and Deep Learning - 01TXFSM.
+This code contains different approaches to the first person activity recognition task. 
 
+The work is based on the [EgoRNN](https://arxiv.org/pdf/1807.11794.pdf) and [LSTA](https://arxiv.org/pdf/2002.03982v1.pdf) 
+architectures, that are further enhanced with the use of a Self-Supervised Motion Segmentation task following the method
+proposed in the paper of [Planamente et. al](https://arxiv.org/pdf/2002.03982v1.pdf).
 #### Prerequisites
 
-* Python 3.5
-* Pytorch 0.3.1
+* Python 3.5 o
+* Pytorch 1.7.0
   #### 
 
-#### Running
-
+### Running
+#### EgoRNN
 * ##### RGB
 
   * ###### Stage 1
@@ -71,56 +74,25 @@ The paper is available in [here](https://arxiv.org/pdf/1807.11794.pdf).
   --decayRate 0.99 
   --memSize 512
   ```
-
-#### **Evaluating the models**
-
-* ##### **RGB**
+* ##### **EgoRNN + MS Task**
 * ```
-  python eval-run-rgb.py --dataset gtea61 
-  --datasetDir ./dataset/gtea_61/split2/test 
-  --modelStateDict best_model_state_rgb.pth 
-  --seqLen 25 
+  python ego-rnn/main-run-MS.py --stage 2
+  --trainDatasetDir ./dataset/gtea_61/split2/train
+  --outDir ./drive/MyDrive/MS_Task_1/frame_16_E
+  --stage1Dict ./drive/MyDrive/rgb_16/stage1/model_rgb_state_dict.pth
+  --seqLen 16 
+  --trainBatchSize 32
+  --numEpochs 150
+  --lr 1e-4
+  --stepSize 50 100
+  --decayRate 0.1
   --memSize 512
-  ```
-* ##### **Flow**
-* ```
-  python eval-run-rgb.py --dataset gtea61 
-  --datasetDir ./dataset/gtea_61/split2/test 
-  --modelStateDict best_model_state_flow.pth 
-  --stackSize 5 
-  --numSegs 5
-  ```
-* ##### **Two Stream**
-* ```
-  python eval-run-twoStream-joint.py --dataset gtea61 
-  --datasetDir ./dataset/gtea_61/split2/test 
-  --modelStateDict best_model_state_twoStream.pth 
-  --seqLen 25 
-  --stackSize 5 
-  --memSize 512
+  --regression
   ```
 
-#### **Pretrained models**
+#### LSTA
 
-The models trained on the fixed split \(S2\) of GTEA 61 can be downloaded from the following links
+#### LSTA MS Task
 
-* RGB model [https://drive.google.com/open?id=1B7Xh6hQ9Py8fmL-pjmLzlCent6dnuex5](https://drive.google.com/open?id=1B7Xh6hQ9Py8fmL-pjmLzlCent6dnuex5 "RGB model")
-* Flow model [https://drive.google.com/open?id=1eG-ZF1IwOtYJqpIIeMASURB0uyCM\_cFd](https://drive.google.com/open?id=1eG-ZF1IwOtYJqpIIeMASURB0uyCM_cFd "Flow model")
-* Two stream model [https://drive.google.com/open?id=11U5xbrOr8GtEhpkxY2lpPsyFDFJ8savp](https://drive.google.com/open?id=11U5xbrOr8GtEhpkxY2lpPsyFDFJ8savp "Two stream model")
-
-The dataset can be downloaded from the following link:
-
-[http://www.cbi.gatech.edu/fpv/](http://www.cbi.gatech.edu/fpv/)
-
-Once the videos are downloaded, extract the frames and optical flow using the following implementation:
-
-[https://github.com/yjxiong/dense\_flow](https://github.com/yjxiong/dense_flow)
-
-Run 'prepareGTEA61Dataset.py' script to make the dataset.
-
-Alternatively, the frames and the corresponding warp optical flow of the GTEA 61 dataset can be downloaded from the following link
-
-* [https://drive.google.com/file/d/1\_y8Y3PnCXsngmZVMqZbg-AfJyIdOeQ2\_/view?usp=sharing](https://drive.google.com/file/d/1_y8Y3PnCXsngmZVMqZbg-AfJyIdOeQ2_/view?usp=sharing "GTEA61")
-
-
+#### LSTA RepFlow Layer
 
