@@ -4,14 +4,14 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 #from MyConvLSTMCell import *
 # local
-from .FlowLayer import FlowLayer
-from . import resNetNew
-from .MyConvLSTACell import *
+#from .FlowLayer import FlowLayer
+#from . import resNetNew
+#from .MyConvLSTACell import *
 
 # Colab
-#import FlowLayer
-#import resNetNew
-#from MyConvLSTACell import *
+from FlowLayer import *
+import resNetNew
+from MyConvLSTACell import *
 
 
 class attentionModelRepFlow(nn.Module):
@@ -22,7 +22,7 @@ class attentionModelRepFlow(nn.Module):
         self.mem_size = mem_size
         self.weight_softmax = self.resNet.fc.weight
         self.flow_layer = FlowLayer(channels=128)
-        self.lstm_cell = MyConvLSTACell(512, mem_size, c_cam_classes=c_cam_classes)
+        self.lsta_cell = MyConvLSTACell(512, mem_size, c_cam_classes=c_cam_classes)
         self.avgpool = nn.AvgPool2d(7)
         self.dropout = nn.Dropout(0.7)
         self.fc = nn.Linear(mem_size, self.num_classes)
@@ -40,8 +40,9 @@ class attentionModelRepFlow(nn.Module):
         mid_features = torch.stack(mid_features).permute(1, 2, 0, 3, 4)
         flow = self.flow_layer(mid_features)
         flows = flow.permute(2, 0, 1, 3, 4)
+        mid_features = mid_features.permute(2, 0, 1, 3, 4)
         for t in range(flows.size(0)):
-            logit, feature_conv, x = self.resNet(flows[t], stage=1)
+            logit, feature_conv, x = self.resNet(flows[t] + mid_features[t], stage=1)
             bz, nc, h, w = feature_conv.size()
             feature_conv1 = feature_conv.view(bz, nc, h * w)
             probs, idxs = logit.sort(1, True)

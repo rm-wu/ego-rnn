@@ -7,16 +7,17 @@ import argparse
 
 import os
 import torch.nn as nn
-#from gen_splits import *
+
 
 # Colab
-#from attentionModel import *
-#from makeDataset import *
+from attentionModelRepFlow import *
+from makeDataset import *
+from gen_splits import *
 
 # local
-from .attentionModelRepFlow import *
-#from gen_splits import *
-from .makeDataset import *
+#from .attentionModelRepFlow import *
+#from .gen_splits import *
+#from .makeDataset import *
 
 
 def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSize, numEpochs, lr1, decay_factor,
@@ -142,7 +143,7 @@ def main_run(dataset, stage, root_dir, out_dir, stage1_dict,seqLen, trainBatchSi
                 print('Checkpoint file {} does not exist'.format(checkpoint_path))
                 sys.exit()
         last_checkpoint = torch.load(checkpoint_path)
-        model.load_state_dict(last_checkpoint['model_state_dict'])
+        model.load_state_dict(last_checkpoint['model_state_dict'], strict=False)
         model.train(False)
         for params in model.parameters():
             params.requires_grad = False
